@@ -1,6 +1,6 @@
 # ask-pro
 
-ask-pro is a Codex plugin bundle for explicit GPT Pro consultation through the ChatGPT macOS app. It packages selected local context, submits it only when the user says `ask pro`, stores session artifacts, and lets Codex treat the copied answer as advisory-only input.
+ask-pro is a Codex plugin bundle for explicit GPT Pro consultation through ChatGPT in Safari. It packages selected local context, submits it only when the user says `ask pro`, stores session artifacts, and lets Codex treat the copied answer as advisory-only input.
 
 ## Install
 
@@ -34,7 +34,7 @@ The hook ignores transcript-only mentions and injects the `skills/ask-pro/SKILL.
 
 ## Runtime Behavior
 
-The primary interaction path is the ChatGPT macOS app operated through the OpenAI bundled Computer Use plugin. AppleScript helpers are limited to deterministic preflight, activation, clipboard, or failure diagnostics. No Chrome/browser fallback is allowed.
+The primary interaction path is Safari opened to ChatGPT web. No Chrome fallback is allowed. The older ChatGPT macOS app path remains documented only as a blocked legacy target in this environment.
 
 After submit, retrieval is scheduled for 5 minutes later, then every 1 minute until the 30 minutes deadline. If `automation_update` is unavailable, the CLI prints the fallback command `ask pro check <session-id>`.
 
@@ -42,7 +42,7 @@ GPT Pro output is advisory-only. Codex must decide what to apply, make local edi
 
 ## Current QA Caveat
 
-In this environment, live ChatGPT.app automation is currently blocked by Computer Use policy for bundle id `com.openai.chat`. The product-side validation handles that safely: ChatGPT.app QA/preflight commands fail clearly and do not silently switch to Chrome or browser automation.
+In this environment, live ChatGPT.app automation is currently blocked by Computer Use policy for bundle id `com.openai.chat`. Safari is the practical target. Product-side validation handles missing Safari transcript or evidence safely and does not silently switch to Chrome automation.
 
 ## Distribution
 

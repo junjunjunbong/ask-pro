@@ -20,7 +20,7 @@
     "title": "Ask Pro",
     "displayName": "Ask Pro",
     "shortDescription": "Capture explicit ask-pro prompts for external advice workflows",
-    "description": "Adds a UserPromptSubmit hook that activates only on current ask pro commands and injects ask-pro mode context without running browser automation.",
+    "description": "Adds a UserPromptSubmit hook that activates only on current ask pro commands and injects ask-pro mode context without running runtime automation from the hook.",
     "longDescription": "Ask Pro is a distributable Codex plugin bundle for explicit ask-pro CLI workflows. Its hook recognizes current prompt commands such as ask pro diagnose this or ask pro check <session-id>, then provides structured context for later skills and scripts.",
     "developerName": "Junwon Seo",
     "category": "Developer Tools",

@@ -1,7 +1,7 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
-import { renderComputerUseInstructions } from "./chatgpt-mac.mjs";
+import { renderSafariInstructions, safariEvidenceNames } from "./chatgpt-safari.mjs";
 import { prepareContextPackage } from "./context-package.mjs";
 import { planDelayedRetrievalSchedule } from "./scheduler.mjs";
 import {
@@ -57,21 +57,22 @@ async function readScheduleKeys({ root, sessionId }) {
   return [...keys].sort();
 }
 
-async function writeComputerUseContract({ root, sessionId, context }) {
-  const evidenceDir = join(sessionRoot(root, sessionId), "computer-use");
+async function writeSafariContract({ root, sessionId, context }) {
+  const evidenceDir = join(sessionRoot(root, sessionId), "safari");
   await mkdir(evidenceDir, { recursive: true });
-  const screenshotPath = join(evidenceDir, "computer-use-screenshot.png");
-  const actionLogPath = join(evidenceDir, "computer-use-action-log.jsonl");
-  const instructions = renderComputerUseInstructions({
-    appName: "ChatGPT",
+  const evidenceNames = safariEvidenceNames();
+  const screenshotPath = join(evidenceDir, evidenceNames.screenshot);
+  const actionLogPath = join(evidenceDir, evidenceNames.actionLog);
+  const instructions = renderSafariInstructions({
     evidenceDir,
     screenshotPath,
     actionLogPath,
   });
-  const requestPath = join(evidenceDir, "computer-use-request.json");
-  const instructionsPath = join(evidenceDir, "computer-use-instructions.md");
+  const requestPath = join(evidenceDir, "safari-request.json");
+  const instructionsPath = join(evidenceDir, "safari-instructions.md");
   const request = {
     schema_version: 1,
+    runtime_target: "safari",
     session_id: sessionId,
     prompt_path: context.promptPath,
     zip_path: context.zipPath,
@@ -119,15 +120,15 @@ export async function submitAskProSession({
     now: at,
     patch: { zip_path: context.zipPath, manifest_path: context.manifestPath },
   });
-  const computerUse = await writeComputerUseContract({ root: storeRoot, sessionId: created.id, context });
+  const safari = await writeSafariContract({ root: storeRoot, sessionId: created.id, context });
   const submission = await chatGpt.submit({
     sessionId: created.id,
     request,
     promptPath: context.promptPath,
     zipPath: context.zipPath,
-    evidenceDir: computerUse.evidenceDir,
-    requestPath: computerUse.requestPath,
-    computerUse,
+    evidenceDir: safari.evidenceDir,
+    requestPath: safari.requestPath,
+    safari,
   });
   if (submission?.ok !== true) {
     throw new Error("ChatGPT adapter did not confirm submission");
@@ -143,7 +144,7 @@ export async function submitAskProSession({
     existingScheduleKeys,
   });
   const schedulePath = await writeSchedule({ root: storeRoot, sessionId: created.id, name: "schedule-submit.json", schedule });
-  return { status: "submitted", session: submitted, context, computer_use: computerUse, schedule, schedule_path: schedulePath };
+  return { status: "submitted", session: submitted, context, safari, schedule, schedule_path: schedulePath };
 }
 
 function transcriptAvailable(copy) {
@@ -183,7 +184,7 @@ export async function checkAskProSession({
     return { status: "timeout", session: timedOut, auto_apply: false };
   }
 
-  const copy = await chatGpt.copyLatest({ sessionId });
+  const copy = await chatGpt.copyLatest({ sessionId, sessionDir: sessionRoot(storeRoot, sessionId) });
   if (!transcriptAvailable(copy)) {
     const waiting = await recordWaitingCheck({ root: storeRoot, sessionId, now: at });
     const existingScheduleKeys = await readScheduleKeys({ root: storeRoot, sessionId });

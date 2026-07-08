@@ -189,13 +189,13 @@ test("qa-chatgpt fails clearly when no copied transcript exists", async () => {
     const state = JSON.parse(await readFile(join(sessionDir, "qa-chatgpt-state.json"), "utf8"));
     assert.equal(state.status, "blocked");
     assert.equal(state.prompt, "Reply with ASK_PRO_QA_OK only.");
-    assert.match(state.action, /Computer Use/);
+    assert.match(state.action, /Safari/);
   } finally {
     await rm(sessionDir, { recursive: true, force: true });
   }
 });
 
-test("qa-chatgpt rejects a marker transcript without Computer Use evidence", async () => {
+test("qa-chatgpt rejects a marker transcript without Safari evidence", async () => {
   const sessionDir = await mkdtemp(join(tmpdir(), "ask-pro-chatgpt-qa-no-evidence-"));
 
   try {
@@ -214,18 +214,18 @@ test("qa-chatgpt rejects a marker transcript without Computer Use evidence", asy
       }),
       (error) => {
         assert.ok(error instanceof ChatGptMacError);
-        assert.equal(error.code, "qa_computer_use_evidence_missing");
-        assert.match(error.action, /Computer Use/);
+        assert.equal(error.code, "qa_safari_evidence_missing");
+        assert.match(error.action, /Safari/);
         return true;
       },
     );
 
     const state = JSON.parse(await readFile(join(sessionDir, "qa-chatgpt-state.json"), "utf8"));
     assert.equal(state.status, "blocked");
-    assert.equal(state.reason, "qa_computer_use_evidence_missing");
+    assert.equal(state.reason, "qa_safari_evidence_missing");
     assert.deepEqual(state.missing_evidence, [
-      join(sessionDir, "computer-use-action-log.jsonl"),
-      join(sessionDir, "computer-use-screenshot.png"),
+      join(sessionDir, "safari-action-log.jsonl"),
+      join(sessionDir, "safari-screenshot.png"),
     ]);
   } finally {
     await rm(sessionDir, { recursive: true, force: true });
@@ -237,8 +237,8 @@ test("qa-chatgpt CLI validates a copied transcript containing the marker", async
 
   try {
     await writeFile(join(sessionDir, "copied-transcript.txt"), "ASK_PRO_QA_OK\n", "utf8");
-    await writeFile(join(sessionDir, "computer-use-action-log.jsonl"), "{\"event\":\"submitted\"}\n", "utf8");
-    await writeFile(join(sessionDir, "computer-use-screenshot.png"), "screenshot-bytes", "utf8");
+    await writeFile(join(sessionDir, "safari-action-log.jsonl"), "{\"event\":\"submitted\"}\n", "utf8");
+    await writeFile(join(sessionDir, "safari-screenshot.png"), "screenshot-bytes", "utf8");
     const { stdout } = await execFileAsync(process.execPath, [
       command,
       "qa-chatgpt",
@@ -261,8 +261,9 @@ test("qa-chatgpt CLI validates a copied transcript containing the marker", async
     assert.equal(output.status, "confirmed");
     assert.equal(output.marker, "ASK_PRO_QA_OK");
     assert.equal(output.transcript_path, join(sessionDir, "copied-transcript.txt"));
-    assert.equal(output.action_log_path, join(sessionDir, "computer-use-action-log.jsonl"));
-    assert.equal(output.screenshot_path, join(sessionDir, "computer-use-screenshot.png"));
+    assert.equal(output.target, "safari");
+    assert.equal(output.action_log_path, join(sessionDir, "safari-action-log.jsonl"));
+    assert.equal(output.screenshot_path, join(sessionDir, "safari-screenshot.png"));
   } finally {
     await rm(sessionDir, { recursive: true, force: true });
   }

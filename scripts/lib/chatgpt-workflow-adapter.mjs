@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -25,13 +26,21 @@ export function createCliChatGptAdapter({
 } = {}) {
   return {
     async submit(request) {
-      throw new ChatGptMacError("ChatGPT.app submission requires Computer Use evidence.", {
-        code: "computer_use_required",
-        action: `Use Computer Use with ${request.requestPath}, then rerun with a test adapter or recorded submit evidence before marking submitted.`,
+      throw new ChatGptMacError("Safari ChatGPT submission requires recorded Safari evidence.", {
+        code: "safari_submit_required",
+        action: `Open ${request.requestPath}, submit through Safari, and save the required Safari screenshot/action-log evidence before marking submitted.`,
       });
     },
 
-    async copyLatest() {
+    async copyLatest({ sessionDir } = {}) {
+      if (typeof sessionDir === "string") {
+        try {
+          const text = await readFile(join(sessionDir, "copied-transcript.txt"), "utf8");
+          return text.trim().length > 0 ? { ok: true, text } : { ok: false, pending: true };
+        } catch (error) {
+          if (error?.code !== "ENOENT") throw error;
+        }
+      }
       if (typeof process.env.ASK_PRO_CHATGPT_COPY_MOCK_RESULT === "string") {
         const result = parseJson(process.env.ASK_PRO_CHATGPT_COPY_MOCK_RESULT, "invalid_copy_mock");
         return result?.ok === true ? result : { ok: false, pending: true };

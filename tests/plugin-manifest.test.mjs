@@ -54,16 +54,16 @@ test("validate-skill passes the ask-pro skill guardrail contract", async () => {
   assert.match(stdout, /PASS validate-skill/);
 });
 
-test("validate-skill fails when Chrome browser fallback guardrail is removed", async () => {
-  // Given: a temporary skill fixture with the browser fallback guardrail removed.
+test("validate-skill fails when Chrome fallback guardrail is removed", async () => {
+  // Given: a temporary skill fixture with the Chrome fallback guardrail removed.
   const source = await readFile(join(root, "skills/ask-pro/SKILL.md"), "utf8");
   const fixtureDir = await mkdtemp(join(tmpdir(), "ask-pro-skill-"));
   const fixturePath = join(fixtureDir, "SKILL.md");
   await writeFile(
     fixturePath,
     source
-      .replace("Do not use Chrome, browser control, web tabs, or a browser fallback.", "Do not use Chrome automation.")
-      .replace("No Chrome or browser fallback.", "No Chrome automation."),
+      .replace("Do not use Chrome as a fallback.", "Prefer Safari.")
+      .replace("No Chrome fallback.", "Safari is preferred."),
   );
 
   // When: the dedicated skill validator runs against the broken fixture.
@@ -76,5 +76,5 @@ test("validate-skill fails when Chrome browser fallback guardrail is removed", a
 
   // Then: the process fails and names the missing semantic guardrail.
   assert.equal(failure?.code, 1);
-  assert.match(failure.stderr, /skill guardrail missing \(no Chrome\/browser fallback wording\)/);
+  assert.match(failure.stderr, /skill guardrail missing \(no Chrome fallback wording\)/);
 });

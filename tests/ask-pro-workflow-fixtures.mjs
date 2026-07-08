@@ -19,8 +19,8 @@ export function fakeSubmitAdapter(calls) {
   return {
     async submit(request) {
       calls.push(request);
-      await writeFile(join(request.evidenceDir, "computer-use-screenshot.png"), "fake screenshot");
-      await writeFile(join(request.evidenceDir, "computer-use-action-log.jsonl"), "{\"ok\":true}\n");
+      await writeFile(join(request.evidenceDir, "safari-screenshot.png"), "fake screenshot");
+      await writeFile(join(request.evidenceDir, "safari-action-log.jsonl"), "{\"ok\":true}\n");
       return { ok: true, submitted_at: "2026-07-08T10:00:00.000Z" };
     },
   };

@@ -22,7 +22,7 @@ const execFileAsync = promisify(execFile);
 const repoRoot = new URL("..", import.meta.url).pathname;
 const command = join(repoRoot, "scripts/ask-pro.mjs");
 
-test("submit packages context, records Computer Use contract, marks submitted, and schedules first check", async () => {
+test("submit packages context, records Safari contract, marks submitted, and schedules first check", async () => {
   const project = await makeProject();
   const root = join(project, ".ask-pro");
   const submitCalls = [];
@@ -42,15 +42,15 @@ test("submit packages context, records Computer Use contract, marks submitted, a
 
     assert.equal(result.session.status, "submitted");
     assert.equal(result.session.id, "workflow-session");
-    assert.match(result.computer_use.instructions, /Computer Use is the primary runtime path/);
-    assert.doesNotMatch(result.computer_use.instructions, /chrome|browser/i);
+    assert.match(result.safari.instructions, /Safari opened to ChatGPT web/);
+    assert.match(result.safari.instructions, /Do not use Chrome/);
     assert.equal(submitCalls.length, 1);
     assert.equal(scheduleCalls.length, 1);
     assert.equal(scheduleCalls[0].sessionId, "workflow-session");
     assert.equal(scheduleCalls[0].submittedAt, "2026-07-08T10:00:00.000Z");
     assert.ok((await stat(result.context.promptPath)).size > 0);
     assert.ok((await stat(result.context.zipPath)).size > 0);
-    assert.ok((await stat(result.computer_use.request_path)).size > 0);
+    assert.ok((await stat(result.safari.request_path)).size > 0);
   } finally {
     await rm(project, { recursive: true, force: true });
   }
@@ -242,7 +242,7 @@ test("packaged session left by failed submit can be retried with the same id", a
   }
 });
 
-test("CLI submit refuses env mock success without Computer Use evidence", async () => {
+test("CLI submit refuses env mock success without Safari evidence", async () => {
   const project = await makeProject();
   const root = join(project, ".ask-pro");
 
@@ -270,7 +270,7 @@ test("CLI submit refuses env mock success without Computer Use evidence", async 
     }));
 
     assert.notEqual(submit.code, 0);
-    assert.match(submit.stderr, /Computer Use evidence/);
+    assert.match(submit.stderr, /Safari evidence/);
     assert.equal(JSON.parse(await readFile(join(root, "sessions", "cli-session", "state.json"), "utf8")).status, "packaged");
   } finally {
     await rm(project, { recursive: true, force: true });

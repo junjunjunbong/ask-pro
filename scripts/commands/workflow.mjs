@@ -34,7 +34,7 @@ export async function submitCommand(args) {
     session_id: result.session.id,
     state: result.session,
     context: result.context,
-    computer_use: result.computer_use,
+    safari: result.safari,
     schedule: result.schedule,
   }, null, 2)}\n`);
 }

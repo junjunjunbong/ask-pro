@@ -26,8 +26,8 @@ const REQUIRED_SKILL_GUARDRAILS = Object.freeze([
   ["explicit ask pro check <session-id> trigger wording", (skill) => /ask pro check\s+<session-id>/i.test(skill)],
   ["session artifacts path", (skill) => /\.ask-pro\/sessions/i.test(skill)],
   [
-    "ChatGPT macOS with Computer Use primary runtime operation",
-    (skill) => /ChatGPT macOS/i.test(skill) && /Computer Use/i.test(skill) && /primary/i.test(skill),
+    "Safari ChatGPT primary runtime operation",
+    (skill) => /Safari/i.test(skill) && /ChatGPT/i.test(skill) && /primary/i.test(skill),
   ],
   [
     "automation_update and fallback ask pro check wording",
@@ -35,8 +35,8 @@ const REQUIRED_SKILL_GUARDRAILS = Object.freeze([
   ],
   ["advisory-only and no auto-apply wording", (skill) => /advisory/i.test(skill) && /(?:no|never)\s+(?:automatic|auto-apply)/i.test(skill)],
   [
-    "no Chrome/browser fallback wording",
-    (skill) => /Chrome/i.test(skill) && /browser/i.test(skill) && /(?:No|Do not use)[\s\S]*Chrome[\s\S]*browser[\s\S]*fallback/i.test(skill),
+    "no Chrome fallback wording",
+    (skill) => /Chrome/i.test(skill) && /fallback/i.test(skill) && /(?:No|Do not use)[\s\S]*Chrome[\s\S]*fallback/i.test(skill),
   ],
 ]);
 
@@ -45,10 +45,10 @@ const REQUIRED_README_GUARDRAILS = Object.freeze([
   ["ask pro usage", (readme) => /ask pro\b/i.test(readme) && /ask pro check\s+<session-id>/i.test(readme)],
   ["session artifacts", (readme) => /\.ask-pro\/sessions/i.test(readme)],
   ["scheduler timing", (readme) => /5 minutes/i.test(readme) && /1 minute/i.test(readme) && /30 minutes/i.test(readme)],
-  ["Computer Use primary path", (readme) => /Computer Use/i.test(readme) && /primary/i.test(readme)],
-  ["no Chrome/browser fallback", (readme) => /No Chrome\/browser fallback/i.test(readme)],
+  ["Safari primary path", (readme) => /Safari/i.test(readme) && /primary/i.test(readme)],
+  ["no Chrome fallback", (readme) => /No Chrome fallback/i.test(readme)],
   ["advisory-only behavior", (readme) => /advisory-only/i.test(readme) || /advisory only/i.test(readme)],
-  ["blocked ChatGPT.app QA caveat", (readme) => /com\.openai\.chat/i.test(readme) && /blocked/i.test(readme)],
+  ["blocked ChatGPT.app caveat", (readme) => /com\.openai\.chat/i.test(readme) && /blocked/i.test(readme)],
   ["validation commands", (readme) => /validate-plugin/i.test(readme) && /pack-plugin/i.test(readme)],
 ]);
 

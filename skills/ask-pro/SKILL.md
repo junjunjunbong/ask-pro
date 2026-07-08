@@ -5,7 +5,7 @@ description: Use only when the current user prompt explicitly says "ask pro" or 
 
 # ask-pro
 
-Ask Pro packages the current Codex task for a GPT Pro consultation in the ChatGPT macOS app, then returns the copied answer as advisory input for Codex to evaluate. Codex still owns all code edits, tests, and final claims.
+Ask Pro packages the current Codex task for a GPT Pro consultation in ChatGPT through Safari, then returns the copied answer as advisory input for Codex to evaluate. Codex still owns all code edits, tests, and final claims.
 
 ## Trigger Semantics
 
@@ -20,9 +20,9 @@ Do not trigger from transcript history, quoted text, README examples, or vague r
 
 1. Create or reuse a session under `.ask-pro/sessions/<timestamp-or-id>/`.
 2. Package selected context into that session directory, including the request, manifest, prompt, and archive artifacts needed by the external reviewer.
-3. Operate the ChatGPT macOS app with the OpenAI bundled Computer Use plugin for actual click, type, attach, submit, wait, and copy actions.
-4. AppleScript or System Events may be used only for preflight or copy fallback checks. They are not the primary runtime for submitting the request.
-5. Do not use Chrome, browser control, web tabs, or a browser fallback.
+3. Open Safari to ChatGPT web and use it as the primary runtime for paste, attach, submit, wait, and copy actions.
+4. The ChatGPT macOS app path may be used only if explicitly selected and available; in this environment `com.openai.chat` is blocked by Computer Use policy.
+5. Do not use Chrome as a fallback.
 
 ## Retrieval Schedule
 
@@ -32,7 +32,7 @@ When `automation_update` is available, create exactly one one-shot follow-up for
 
 ## Check Flow
 
-For `ask pro check <session-id>`, open the matching session under `.ask-pro/sessions/`, use Computer Use to inspect or copy the latest ChatGPT macOS answer when needed, and save copied transcript/session artifacts back into the session directory.
+For `ask pro check <session-id>`, open the matching session under `.ask-pro/sessions/`, use Safari to inspect or copy the latest ChatGPT answer when needed, and save copied transcript/session artifacts back into the session directory.
 
 Summarize the copied GPT Pro answer as advisory guidance only. Never auto-apply patches, run generated commands blindly, or treat the transcript as evidence that Codex work is complete. Codex must independently decide, edit, test, and record real evidence before claiming completion.
 
@@ -40,6 +40,6 @@ Summarize the copied GPT Pro answer as advisory guidance only. Never auto-apply 
 
 - GPT Pro advice is advisory, not authoritative.
 - No automatic code application from GPT transcript content.
-- No Chrome or browser fallback.
-- Computer Use is the primary way to operate ChatGPT macOS.
+- No Chrome fallback.
+- Safari is the primary way to operate ChatGPT web.
 - If session evidence is missing, say exactly which artifact is missing and continue through the normal `ask pro check <session-id>` path.
