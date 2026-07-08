@@ -7,6 +7,7 @@ import {
   chatGptPreflight,
   MalformedHookInputError,
   prepareContext,
+  qaChatGpt,
   runHook,
   schedulerFixture,
   sessionFixture,
@@ -44,6 +45,9 @@ async function main() {
       break;
     case "chatgpt-preflight":
       await chatGptPreflight(args);
+      break;
+    case "qa-chatgpt":
+      await qaChatGpt(args);
       break;
     case "submit":
       await submitCommand(args);

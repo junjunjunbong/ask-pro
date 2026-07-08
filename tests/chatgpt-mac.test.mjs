@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -14,6 +14,7 @@ import {
   runChatGptPreflight,
   validateChatGptAppName,
 } from "../scripts/lib/chatgpt-mac.mjs";
+import { runChatGptQa } from "../scripts/lib/chatgpt-qa.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = new URL("..", import.meta.url).pathname;
@@ -159,5 +160,110 @@ test("chatgpt-preflight CLI route writes parseable evidence", async () => {
     assert.equal(JSON.parse(await readFile(join(evidenceDir, "preflight-result.json"), "utf8")).ok, true);
   } finally {
     await rm(evidenceDir, { recursive: true, force: true });
+  }
+});
+
+test("qa-chatgpt fails clearly when no copied transcript exists", async () => {
+  const sessionDir = await mkdtemp(join(tmpdir(), "ask-pro-chatgpt-qa-missing-"));
+
+  try {
+    await assert.rejects(
+      () => runChatGptQa({
+        sessionDir,
+        prompt: "Reply with ASK_PRO_QA_OK only.",
+        preflight: async () => ({
+          ok: true,
+          app_name: "ChatGPT",
+          checks: [{ name: "app_installed", ok: true, message: "found ChatGPT.app" }],
+        }),
+        now: () => new Date("2026-07-08T03:00:00.000Z"),
+      }),
+      (error) => {
+        assert.ok(error instanceof ChatGptMacError);
+        assert.equal(error.code, "qa_transcript_missing");
+        assert.match(error.message, /copied transcript is missing/);
+        return true;
+      },
+    );
+
+    const state = JSON.parse(await readFile(join(sessionDir, "qa-chatgpt-state.json"), "utf8"));
+    assert.equal(state.status, "blocked");
+    assert.equal(state.prompt, "Reply with ASK_PRO_QA_OK only.");
+    assert.match(state.action, /Computer Use/);
+  } finally {
+    await rm(sessionDir, { recursive: true, force: true });
+  }
+});
+
+test("qa-chatgpt rejects a marker transcript without Computer Use evidence", async () => {
+  const sessionDir = await mkdtemp(join(tmpdir(), "ask-pro-chatgpt-qa-no-evidence-"));
+
+  try {
+    await writeFile(join(sessionDir, "copied-transcript.txt"), "ASK_PRO_QA_OK\n", "utf8");
+
+    await assert.rejects(
+      () => runChatGptQa({
+        sessionDir,
+        prompt: "Reply with ASK_PRO_QA_OK only.",
+        preflight: async () => ({
+          ok: true,
+          app_name: "ChatGPT",
+          checks: [{ name: "app_installed", ok: true, message: "found ChatGPT.app" }],
+        }),
+        now: () => new Date("2026-07-08T03:00:00.000Z"),
+      }),
+      (error) => {
+        assert.ok(error instanceof ChatGptMacError);
+        assert.equal(error.code, "qa_computer_use_evidence_missing");
+        assert.match(error.action, /Computer Use/);
+        return true;
+      },
+    );
+
+    const state = JSON.parse(await readFile(join(sessionDir, "qa-chatgpt-state.json"), "utf8"));
+    assert.equal(state.status, "blocked");
+    assert.equal(state.reason, "qa_computer_use_evidence_missing");
+    assert.deepEqual(state.missing_evidence, [
+      join(sessionDir, "computer-use-action-log.jsonl"),
+      join(sessionDir, "computer-use-screenshot.png"),
+    ]);
+  } finally {
+    await rm(sessionDir, { recursive: true, force: true });
+  }
+});
+
+test("qa-chatgpt CLI validates a copied transcript containing the marker", async () => {
+  const sessionDir = await mkdtemp(join(tmpdir(), "ask-pro-chatgpt-qa-pass-"));
+
+  try {
+    await writeFile(join(sessionDir, "copied-transcript.txt"), "ASK_PRO_QA_OK\n", "utf8");
+    await writeFile(join(sessionDir, "computer-use-action-log.jsonl"), "{\"event\":\"submitted\"}\n", "utf8");
+    await writeFile(join(sessionDir, "computer-use-screenshot.png"), "screenshot-bytes", "utf8");
+    const { stdout } = await execFileAsync(process.execPath, [
+      command,
+      "qa-chatgpt",
+      "--session",
+      sessionDir,
+      "--prompt",
+      "Reply with ASK_PRO_QA_OK only.",
+    ], {
+      env: {
+        ...process.env,
+        ASK_PRO_CHATGPT_PREFLIGHT_MOCK_RESULT: JSON.stringify({
+          ok: true,
+          app_name: "ChatGPT",
+          checks: [{ name: "app_installed", ok: true, message: "found ChatGPT.app" }],
+        }),
+      },
+    });
+
+    const output = JSON.parse(stdout);
+    assert.equal(output.status, "confirmed");
+    assert.equal(output.marker, "ASK_PRO_QA_OK");
+    assert.equal(output.transcript_path, join(sessionDir, "copied-transcript.txt"));
+    assert.equal(output.action_log_path, join(sessionDir, "computer-use-action-log.jsonl"));
+    assert.equal(output.screenshot_path, join(sessionDir, "computer-use-screenshot.png"));
+  } finally {
+    await rm(sessionDir, { recursive: true, force: true });
   }
 });

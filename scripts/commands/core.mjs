@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 import { runChatGptPreflight } from "../lib/chatgpt-mac.mjs";
+import { runChatGptQa } from "../lib/chatgpt-qa.mjs";
 import { prepareContextPackage } from "../lib/context-package.mjs";
 import { MalformedHookInputError, parseHookInput, renderUserPromptSubmitHook } from "../lib/hook-output.mjs";
 import { planDelayedRetrievalSchedule } from "../lib/scheduler.mjs";
@@ -214,6 +215,15 @@ export async function chatGptPreflight(args) {
   const report = await runChatGptPreflight({ evidenceDir: requireOption(options, "evidence") });
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   if (!report.ok) process.exitCode = 1;
+}
+
+export async function qaChatGpt(args) {
+  const options = parseOptions(args);
+  const result = await runChatGptQa({
+    sessionDir: requireOption(options, "session"),
+    prompt: requireOption(options, "prompt"),
+  });
+  process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
 }
 
 export { MalformedHookInputError };
