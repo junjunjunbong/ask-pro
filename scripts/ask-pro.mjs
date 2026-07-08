@@ -6,6 +6,7 @@ import { ChatGptMacError } from "./lib/chatgpt-mac.mjs";
 import {
   chatGptPreflight,
   MalformedHookInputError,
+  packPlugin,
   prepareContext,
   qaChatGpt,
   runHook,
@@ -27,6 +28,9 @@ async function main() {
       break;
     case "validate-skill":
       await validateSkill(args);
+      break;
+    case "pack-plugin":
+      await packPlugin(args);
       break;
     case "hook":
       await runHook(args);

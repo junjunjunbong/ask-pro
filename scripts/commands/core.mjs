@@ -5,6 +5,7 @@ import { runChatGptPreflight } from "../lib/chatgpt-mac.mjs";
 import { runChatGptQa } from "../lib/chatgpt-qa.mjs";
 import { prepareContextPackage } from "../lib/context-package.mjs";
 import { MalformedHookInputError, parseHookInput, renderUserPromptSubmitHook } from "../lib/hook-output.mjs";
+import { packPluginBundle } from "../lib/plugin-pack.mjs";
 import { planDelayedRetrievalSchedule } from "../lib/scheduler.mjs";
 import {
   acquireSessionLock,
@@ -39,6 +40,18 @@ const REQUIRED_SKILL_GUARDRAILS = Object.freeze([
   ],
 ]);
 
+const REQUIRED_README_GUARDRAILS = Object.freeze([
+  ["install instructions", (readme) => /install/i.test(readme) && /codex/i.test(readme)],
+  ["ask pro usage", (readme) => /ask pro\b/i.test(readme) && /ask pro check\s+<session-id>/i.test(readme)],
+  ["session artifacts", (readme) => /\.ask-pro\/sessions/i.test(readme)],
+  ["scheduler timing", (readme) => /5 minutes/i.test(readme) && /1 minute/i.test(readme) && /30 minutes/i.test(readme)],
+  ["Computer Use primary path", (readme) => /Computer Use/i.test(readme) && /primary/i.test(readme)],
+  ["no Chrome/browser fallback", (readme) => /No Chrome\/browser fallback/i.test(readme)],
+  ["advisory-only behavior", (readme) => /advisory-only/i.test(readme) || /advisory only/i.test(readme)],
+  ["blocked ChatGPT.app QA caveat", (readme) => /com\.openai\.chat/i.test(readme) && /blocked/i.test(readme)],
+  ["validation commands", (readme) => /validate-plugin/i.test(readme) && /pack-plugin/i.test(readme)],
+]);
+
 function normalizePluginPath(value) {
   return value.replace(/^\.\//u, "");
 }
@@ -58,6 +71,21 @@ async function validateSkillFile(skillPath) {
   }
   for (const [name, accepts] of REQUIRED_SKILL_GUARDRAILS) {
     if (!accepts(skill)) errors.push(`skill guardrail missing (${name})`);
+  }
+  return errors;
+}
+
+async function validateReadmeFile(readmePath) {
+  const errors = [];
+  let readme;
+  try {
+    readme = await readFile(readmePath, "utf8");
+  } catch (error) {
+    errors.push(`missing or unreadable README path: ${readmePath}: ${error.message}`);
+    return errors;
+  }
+  for (const [name, accepts] of REQUIRED_README_GUARDRAILS) {
+    if (!accepts(readme)) errors.push(`README guardrail missing (${name})`);
   }
   return errors;
 }
@@ -114,6 +142,13 @@ export async function validatePlugin(args) {
       errors.push(...skillErrors.map((error) => error.replace(absoluteSkillPath, skillPath)));
     }
 
+    const readmeErrors = await validateReadmeFile(join(root, "README.md"));
+    if (readmeErrors.length === 0) {
+      checked.push("README.md (install/use instructions)");
+    } else {
+      errors.push(...readmeErrors);
+    }
+
     for (const hookPath of manifest.hooks ?? []) {
       const normalizedHookPath = normalizePluginPath(hookPath);
       const absoluteHookPath = join(root, normalizedHookPath);
@@ -136,6 +171,18 @@ export async function validatePlugin(args) {
     return;
   }
   console.log("PASS validate-plugin");
+}
+
+export async function packPlugin(args) {
+  const options = parseOptions(args);
+  const root = resolve(typeof options.root === "string" ? options.root : ".");
+  const out = resolve(requireOption(options, "out"));
+  const result = await packPluginBundle({ root, out });
+  process.stdout.write(`${JSON.stringify({
+    status: "packed",
+    archive: result.archive,
+    files: result.files,
+  }, null, 2)}\n`);
 }
 
 export async function runHook(args) {
