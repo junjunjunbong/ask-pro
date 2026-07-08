@@ -1,4 +1,5 @@
 const USER_PROMPT_SUBMIT = "UserPromptSubmit";
+const NEGATED_TRIGGER_PREFIX = /\b(?:do\s+not|don't|dont|did\s+not|never)\s+(?:(?:use|run|invoke)\s+)?$/u;
 
 class MalformedHookInputError extends Error {
   constructor(cause) {
@@ -19,7 +20,7 @@ function xmlEscape(value) {
 
 function hasObviousNegation(prompt, triggerIndex) {
   const prefix = prompt.slice(Math.max(0, triggerIndex - 40), triggerIndex).toLowerCase();
-  return /\b(?:do\s+not|don't|dont|never)\s+$/u.test(prefix);
+  return NEGATED_TRIGGER_PREFIX.test(prefix);
 }
 
 function parsePromptCommand(prompt) {

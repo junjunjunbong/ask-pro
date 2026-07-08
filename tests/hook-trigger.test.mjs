@@ -103,14 +103,25 @@ test("ignores transcript-only ask pro mentions", async () => {
 
 test("ignores obvious negated ask pro prompt", async () => {
   // Given: the current prompt mentions ask pro only to prohibit using it.
-  const input = JSON.stringify({ hook_event_name: "UserPromptSubmit", prompt: "do not ask pro about this" });
+  const negatedPrompts = [
+    "do not ask pro about this",
+    "do not use ask pro",
+    "please do not use ask pro",
+    "don't run ask pro",
+    "never invoke ask pro",
+    "I did not ask pro",
+  ];
 
-  // When: the hook runs.
-  const result = await runHook(input);
+  for (const prompt of negatedPrompts) {
+    const input = JSON.stringify({ hook_event_name: "UserPromptSubmit", prompt });
 
-  // Then: it is silent rather than activating ask-pro.
-  assert.equal(result.code, 0);
-  assert.equal(result.stdout, "");
+    // When: the hook runs.
+    const result = await runHook(input);
+
+    // Then: it is silent rather than activating ask-pro.
+    assert.equal(result.code, 0, prompt);
+    assert.equal(result.stdout, "", prompt);
+  }
 });
 
 test("malformed JSON is rejected without hook output", async () => {
