@@ -4,7 +4,10 @@ import { access, readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { prepareContextPackage } from "./lib/context-package.mjs";
+import { ChatGptMacError, runChatGptPreflight } from "./lib/chatgpt-mac.mjs";
 import { MalformedHookInputError, parseHookInput, renderUserPromptSubmitHook } from "./lib/hook-output.mjs";
+import { AskProSchedulerInputError, planDelayedRetrievalSchedule } from "./lib/scheduler.mjs";
 import {
   AskProSessionLockedError,
   acquireSessionLock,
@@ -206,6 +209,59 @@ async function sessionLockFixture(args) {
   process.stdout.write(`${JSON.stringify({ locked: true, session_id: sessionId, lock_path: lock.path }, null, 2)}\n`);
 }
 
+async function schedulerFixture(args) {
+  const options = parseOptions(args);
+  const existingScheduleKeys = typeof options["existing-schedule-key"] === "string"
+    ? [options["existing-schedule-key"]]
+    : [];
+  const output = planDelayedRetrievalSchedule({
+    sessionId: requireOption(options, "session-id"),
+    submittedAt: requireOption(options, "submitted-at"),
+    now: requireOption(options, "now"),
+    automation: requireOption(options, "automation"),
+    existingScheduleKeys,
+  });
+
+  process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
+  if (output.status === "failed") {
+    process.exitCode = 1;
+  }
+}
+
+async function prepareContext(args) {
+  const options = parseOptions(args);
+  const result = await prepareContextPackage({
+    project: requireOption(options, "project"),
+    request: requireOption(options, "request"),
+    out: requireOption(options, "out"),
+  });
+
+  process.stdout.write(
+    `${JSON.stringify(
+      {
+        status: result.status,
+        manifest: result.manifestPath,
+        prompt: result.promptPath,
+        zip: result.zipPath,
+      },
+      null,
+      2,
+    )}\n`,
+  );
+}
+
+async function chatGptPreflight(args) {
+  const options = parseOptions(args);
+  const report = await runChatGptPreflight({
+    evidenceDir: requireOption(options, "evidence"),
+  });
+
+  process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+  if (!report.ok) {
+    process.exitCode = 1;
+  }
+}
+
 async function main() {
   const [command, ...args] = process.argv.slice(2);
   switch (command) {
@@ -221,6 +277,15 @@ async function main() {
     case "session-lock-fixture":
       await sessionLockFixture(args);
       break;
+    case "scheduler-fixture":
+      await schedulerFixture(args);
+      break;
+    case "prepare-context":
+      await prepareContext(args);
+      break;
+    case "chatgpt-preflight":
+      await chatGptPreflight(args);
+      break;
     default:
       throw new Error(`unknown command: ${command ?? ""}`);
   }
@@ -234,6 +299,17 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
     }
     if (error instanceof AskProSessionLockedError) {
       console.error(error.message);
+      process.exit(1);
+    }
+    if (error instanceof AskProSchedulerInputError) {
+      console.error(error.message);
+      process.exit(1);
+    }
+    if (error instanceof ChatGptMacError) {
+      console.error(error.message);
+      if (typeof error.action === "string") {
+        console.error(`action: ${error.action}`);
+      }
       process.exit(1);
     }
     console.error(error.message);
