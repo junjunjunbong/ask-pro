@@ -25,12 +25,6 @@ export function createCliChatGptAdapter({
 } = {}) {
   return {
     async submit(request) {
-      if (typeof process.env.ASK_PRO_CHATGPT_SUBMIT_MOCK_RESULT === "string") {
-        const result = parseJson(process.env.ASK_PRO_CHATGPT_SUBMIT_MOCK_RESULT, "invalid_submit_mock");
-        if (result?.ok === true) {
-          return result;
-        }
-      }
       throw new ChatGptMacError("ChatGPT.app submission requires Computer Use evidence.", {
         code: "computer_use_required",
         action: `Use Computer Use with ${request.requestPath}, then rerun with a test adapter or recorded submit evidence before marking submitted.`,

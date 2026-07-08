@@ -46,6 +46,13 @@ export function fakeScheduler(calls) {
   };
 }
 
+export function execResult(promise) {
+  return promise.then(
+    () => ({ code: 0, stderr: "" }),
+    (error) => ({ code: error.code, stderr: error.stderr }),
+  );
+}
+
 export async function submittedFixture({ copyLatest, clock = fixedClock("2026-07-08T10:00:00.000Z") }) {
   const project = await makeProject();
   const root = join(project, ".ask-pro");

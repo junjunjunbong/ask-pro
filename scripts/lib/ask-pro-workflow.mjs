@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 import { renderComputerUseInstructions } from "./chatgpt-mac.mjs";
@@ -11,6 +11,7 @@ import {
   submitSession,
   transitionSession,
 } from "./session-store.mjs";
+import { sessionRoot, statePath } from "./session-paths.mjs";
 
 function currentDate(now) {
   const value = typeof now === "function" ? now() : now;
@@ -21,14 +22,10 @@ function iso(date) {
   return date.toISOString();
 }
 
-function sessionDir(root, sessionId) {
-  return join(root, "sessions", sessionId);
-}
-
 async function patchSession({ root, sessionId, patch, now }) {
   const current = await readSession({ root, sessionId });
   const next = { ...current, ...patch, updated_at: iso(now) };
-  await writeFile(join(sessionDir(root, sessionId), "state.json"), `${JSON.stringify(next, null, 2)}\n`);
+  await writeFile(statePath(root, sessionId), `${JSON.stringify(next, null, 2)}\n`);
   return readSession({ root, sessionId });
 }
 
@@ -37,13 +34,31 @@ function defaultScheduler(input) {
 }
 
 async function writeSchedule({ root, sessionId, name, schedule }) {
-  const path = join(sessionDir(root, sessionId), name);
+  const path = join(sessionRoot(root, sessionId), name);
   await writeFile(path, `${JSON.stringify(schedule, null, 2)}\n`);
   return path;
 }
 
+async function readScheduleKeys({ root, sessionId }) {
+  const dir = sessionRoot(root, sessionId);
+  const names = await readdir(dir).catch((error) => {
+    if (error?.code === "ENOENT") {
+      return [];
+    }
+    throw error;
+  });
+  const keys = new Set();
+  await Promise.all(names.filter((name) => /^schedule-.*\.json$/u.test(name)).map(async (name) => {
+    const schedule = JSON.parse(await readFile(join(dir, name), "utf8"));
+    if (typeof schedule.schedule_key === "string") {
+      keys.add(schedule.schedule_key);
+    }
+  }));
+  return [...keys].sort();
+}
+
 async function writeComputerUseContract({ root, sessionId, context }) {
-  const evidenceDir = join(sessionDir(root, sessionId), "computer-use");
+  const evidenceDir = join(sessionRoot(root, sessionId), "computer-use");
   await mkdir(evidenceDir, { recursive: true });
   const screenshotPath = join(evidenceDir, "computer-use-screenshot.png");
   const actionLogPath = join(evidenceDir, "computer-use-action-log.jsonl");
@@ -93,9 +108,11 @@ export async function submitAskProSession({
   const storeRoot = resolve(root);
   const projectRoot = resolve(project);
   const created = await createSession({ root: storeRoot, now: at, sessionId });
-  const out = join(sessionDir(storeRoot, created.id), "context");
+  const out = join(sessionRoot(storeRoot, created.id), "context");
   const context = await prepareContextPackage({ project: projectRoot, request, out, now: at });
-  await transitionSession({ root: storeRoot, sessionId: created.id, status: "packaged", now: at });
+  if (created.status !== "packaged") {
+    await transitionSession({ root: storeRoot, sessionId: created.id, status: "packaged", now: at });
+  }
   await patchSession({
     root: storeRoot,
     sessionId: created.id,
@@ -117,12 +134,13 @@ export async function submitAskProSession({
   }
   const submittedAt = submittedAtFrom(submission, at);
   const submitted = await submitSession({ root: storeRoot, sessionId: created.id, now: submittedAt });
+  const existingScheduleKeys = await readScheduleKeys({ root: storeRoot, sessionId: created.id });
   const schedule = scheduler({
     sessionId: created.id,
     submittedAt: submitted.submitted_at,
     now: iso(submittedAt),
     automation,
-    existingScheduleKeys: [],
+    existingScheduleKeys,
   });
   const schedulePath = await writeSchedule({ root: storeRoot, sessionId: created.id, name: "schedule-submit.json", schedule });
   return { status: "submitted", session: submitted, context, computer_use: computerUse, schedule, schedule_path: schedulePath };
@@ -168,23 +186,24 @@ export async function checkAskProSession({
   const copy = await chatGpt.copyLatest({ sessionId });
   if (!transcriptAvailable(copy)) {
     const waiting = await recordWaitingCheck({ root: storeRoot, sessionId, now: at });
+    const existingScheduleKeys = await readScheduleKeys({ root: storeRoot, sessionId });
     const schedule = scheduler({
       sessionId,
       submittedAt: waiting.submitted_at,
       now: iso(at),
       automation,
-      existingScheduleKeys: [],
+      existingScheduleKeys,
     });
     const schedulePath = await writeSchedule({ root: storeRoot, sessionId, name: `schedule-check-${waiting.retry_count}.json`, schedule });
     return { status: "pending", session: waiting, schedule, schedule_path: schedulePath, auto_apply: false };
   }
 
   await recordWaitingCheck({ root: storeRoot, sessionId, now: at });
-  const transcriptPath = join(sessionDir(storeRoot, sessionId), "transcript.md");
+  const transcriptPath = join(sessionRoot(storeRoot, sessionId), "transcript.md");
   await writeFile(transcriptPath, copy.text);
   await transitionSession({ root: storeRoot, sessionId, status: "copied", now: at });
   await patchSession({ root: storeRoot, sessionId, now: at, patch: { transcript_path: transcriptPath } });
-  const summaryPath = join(sessionDir(storeRoot, sessionId), "advice-summary.md");
+  const summaryPath = join(sessionRoot(storeRoot, sessionId), "advice-summary.md");
   await writeFile(summaryPath, renderAdviceSummary({ sessionId, transcript: copy.text }));
   await transitionSession({ root: storeRoot, sessionId, status: "advice_summarized", now: at });
   const summarized = await patchSession({ root: storeRoot, sessionId, now: at, patch: { advice_summary_path: summaryPath } });

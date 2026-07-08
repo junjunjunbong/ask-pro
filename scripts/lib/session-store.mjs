@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+
+import { lockPath, sessionRoot, statePath, validateSessionId } from "./session-paths.mjs";
 
 export const SESSION_STATUSES = Object.freeze([
   "created",
@@ -56,18 +57,6 @@ function timestampId(value) {
     .replaceAll("-", "")
     .replaceAll(":", "")
     .replace(/\.\d{3}Z$/u, "Z");
-}
-
-function sessionRoot(root, sessionId) {
-  return join(root, "sessions", sessionId);
-}
-
-function statePath(root, sessionId) {
-  return join(sessionRoot(root, sessionId), "state.json");
-}
-
-function lockPath(root, sessionId) {
-  return join(sessionRoot(root, sessionId), ".lock");
 }
 
 async function writeSession(root, state) {
@@ -164,7 +153,7 @@ export function generateSessionId({ now, token = randomBytes(3).toString("hex") 
 }
 
 export async function createSession({ root, now, token, sessionId }) {
-  const id = sessionId ?? generateSessionId({ now, token });
+  const id = validateSessionId(sessionId ?? generateSessionId({ now, token }));
   try {
     return await readSession({ root, sessionId: id });
   } catch (error) {

@@ -47,6 +47,22 @@ async function makeGitFixture(prefix = "ask-pro-context-") {
   return project;
 }
 
+async function makeTrackedEnvDiffFixture() {
+  const project = await mkdtemp(join(tmpdir(), "ask-pro-context-secret-diff-"));
+  await git(project, ["init"]);
+  await git(project, ["config", "user.email", "ask-pro@example.test"]);
+  await git(project, ["config", "user.name", "Ask Pro Test"]);
+  await writeFile(join(project, ".env"), "OPENAI_API_KEY=old-secret\n");
+  await writeFile(join(project, "package.json"), `${JSON.stringify({ name: "fixture" }, null, 2)}\n`);
+  await mkdir(join(project, "src"), { recursive: true });
+  await writeFile(join(project, "src/parser.js"), "export const parser = true;\n");
+  await git(project, ["add", "."]);
+  await git(project, ["commit", "-m", "initial"]);
+  await writeFile(join(project, ".env"), "OPENAI_API_KEY=new-secret-should-not-leak\n");
+  await writeFile(join(project, "src/parser.js"), "export const parser = false;\n");
+  return project;
+}
+
 test("prepareContextPackage writes manifest, prompt, zip, selected files, and git diff safely", async () => {
   const project = await makeGitFixture();
   const out = await mkdtemp(join(tmpdir(), "ask-pro-context-out-"));
@@ -88,6 +104,34 @@ test("prepareContextPackage writes manifest, prompt, zip, selected files, and gi
     assert.equal(zipEntries.some((entry) => entry.includes(".git/")), false);
     assert.equal(zipEntries.some((entry) => entry.includes(".ask-pro/")), false);
     assert.equal(zipEntries.some((entry) => entry.includes("node_modules/")), false);
+  } finally {
+    await rm(project, { recursive: true, force: true });
+    await rm(out, { recursive: true, force: true });
+  }
+});
+
+test("prepareContextPackage excludes tracked secret file diffs from patch and archive", async () => {
+  const project = await makeTrackedEnvDiffFixture();
+  const out = await mkdtemp(join(tmpdir(), "ask-pro-context-secret-diff-out-"));
+
+  try {
+    const result = await prepareContextPackage({
+      project,
+      request: "ask pro fix parser",
+      out,
+      now: new Date("2026-07-08T00:00:00.000Z"),
+    });
+    const manifest = JSON.parse(await readFile(result.manifestPath, "utf8"));
+    const patch = await readFile(join(out, "git-diff.patch"), "utf8");
+    const { stdout: archivedPatch } = await execFileAsync("unzip", ["-p", result.zipPath, "git-diff.patch"]);
+
+    assert.equal(manifest.files.skipped.some((file) => file.path === ".env" && file.reason === "excluded-path"), true);
+    for (const value of [manifest.git.diff, patch, archivedPatch]) {
+      assert.doesNotMatch(value, /new-secret-should-not-leak/);
+      assert.doesNotMatch(value, /OPENAI_API_KEY/);
+      assert.doesNotMatch(value, /diff --git a\/\.env b\/\.env/);
+      assert.match(value, /src\/parser\.js/);
+    }
   } finally {
     await rm(project, { recursive: true, force: true });
     await rm(out, { recursive: true, force: true });

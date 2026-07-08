@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -101,6 +101,32 @@ test("persisted malformed session shape is rejected at the storage boundary", as
     );
   } finally {
     await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("session ids cannot escape the sessions directory", async () => {
+  const parent = await mkdtemp(join(tmpdir(), "ask-pro-session-traversal-"));
+  const root = join(parent, "store");
+  const now = new Date("2026-07-08T10:00:00.000Z");
+  const sessionId = "../../escaped-session";
+
+  try {
+    await mkdir(root, { recursive: true });
+    await assert.rejects(
+      () => createSession({ root, now, sessionId }),
+      (error) => error?.code === "ASK_PRO_INVALID_SESSION_ID",
+    );
+    await assert.rejects(
+      () => readSession({ root, sessionId }),
+      (error) => error?.code === "ASK_PRO_INVALID_SESSION_ID",
+    );
+    await assert.rejects(
+      () => acquireSessionLock({ root, sessionId, now }),
+      (error) => error?.code === "ASK_PRO_INVALID_SESSION_ID",
+    );
+    await assert.rejects(() => access(join(parent, "escaped-session", "state.json")), { code: "ENOENT" });
+  } finally {
+    await rm(parent, { recursive: true, force: true });
   }
 });
 

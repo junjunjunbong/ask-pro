@@ -40,6 +40,15 @@ export async function gitCandidates(project) {
   return stdout.split("\0").filter(Boolean).map(toPosixPath).sort();
 }
 
+function redactSensitiveDiff(diff) {
+  return diff.split("\n").map((line) => {
+    if (!/^[ +-]/u.test(line) || line.startsWith("+++") || line.startsWith("---")) {
+      return line;
+    }
+    return secretReason(line.slice(1)) === null ? line : `${line[0]}[ASK_PRO_REDACTED_SECRET]`;
+  }).join("\n");
+}
+
 export async function walkCandidates(project, outputRoot, current = project) {
   const entries = await readdir(current, { withFileTypes: true });
   const paths = [];
@@ -68,16 +77,20 @@ export async function gitInfo(project, isGitRepo) {
     return { is_repo: false, status: "", diff: "", changed_paths: [] };
   }
 
-  const [{ stdout: status }, { stdout: diff }, { stdout: changed }] = await Promise.all([
+  const [{ stdout: status }, { stdout: changed }] = await Promise.all([
     runGit(project, ["status", "--short", "--", "."]),
-    runGit(project, ["diff", "--no-ext-diff", "--no-color", "HEAD", "--", "."]),
     runGit(project, ["diff", "--name-only", "HEAD", "--", "."]),
   ]);
+  const changedPaths = changed.split("\n").filter(Boolean).map(toPosixPath);
+  const diffPaths = changedPaths.filter((path) => excludedPathReason(path) === null);
+  const diff = diffPaths.length === 0
+    ? ""
+    : redactSensitiveDiff((await runGit(project, ["diff", "--no-ext-diff", "--no-color", "HEAD", "--", ...diffPaths])).stdout);
   return {
     is_repo: true,
     status,
     diff,
-    changed_paths: changed.split("\n").filter(Boolean).map(toPosixPath),
+    changed_paths: diffPaths,
   };
 }
 

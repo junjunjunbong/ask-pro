@@ -10,6 +10,7 @@ import {
   submitAskProSession,
 } from "../scripts/lib/ask-pro-workflow.mjs";
 import {
+  execResult,
   fakeScheduler,
   fakeSubmitAdapter,
   fixedClock,
@@ -163,12 +164,90 @@ test("copied advice that asks for edits is never auto-applied to the project", a
   }
 });
 
-test("CLI submit and check commands route the workflow with explicit mock ChatGPT evidence", async () => {
+test("replayed pending check does not emit a duplicate automation request", async () => {
+  const project = await makeProject();
+  const root = join(project, ".ask-pro");
+  const submitCalls = [];
+  const pendingChatGpt = { copyLatest: async () => ({ ok: false, pending: true }) };
+
+  try {
+    await submitAskProSession({
+      root,
+      project,
+      request: "Review duplicate scheduling.",
+      now: fixedClock("2026-07-08T10:00:00.000Z"),
+      chatGpt: fakeSubmitAdapter(submitCalls),
+      automation: "available",
+      sessionId: "replay-session",
+    });
+
+    const first = await checkAskProSession({
+      root,
+      sessionId: "replay-session",
+      now: fixedClock("2026-07-08T10:05:00.000Z"),
+      chatGpt: pendingChatGpt,
+      automation: "available",
+    });
+    const replay = await checkAskProSession({
+      root,
+      sessionId: "replay-session",
+      now: fixedClock("2026-07-08T10:05:00.000Z"),
+      chatGpt: pendingChatGpt,
+      automation: "available",
+    });
+
+    assert.equal(Object.hasOwn(first.schedule, "automation_request"), true);
+    assert.equal(replay.schedule.duplicate, true);
+    assert.equal(replay.schedule.new_schedule_count, 0);
+    assert.equal(Object.hasOwn(replay.schedule, "automation_request"), false);
+  } finally {
+    await rm(project, { recursive: true, force: true });
+  }
+});
+
+test("packaged session left by failed submit can be retried with the same id", async () => {
   const project = await makeProject();
   const root = join(project, ".ask-pro");
 
   try {
-    const submit = await execFileAsync(process.execPath, [
+    await assert.rejects(
+      () =>
+        submitAskProSession({
+          root,
+          project,
+          request: "Retry failed submit.",
+          now: fixedClock("2026-07-08T10:00:00.000Z"),
+          chatGpt: { submit: async () => ({ ok: false }) },
+          automation: "unavailable",
+          sessionId: "retry-session",
+        }),
+      /ChatGPT adapter did not confirm submission/,
+    );
+
+    const retry = await submitAskProSession({
+      root,
+      project,
+      request: "Retry failed submit.",
+      now: fixedClock("2026-07-08T10:01:00.000Z"),
+      chatGpt: fakeSubmitAdapter([]),
+      automation: "unavailable",
+      sessionId: "retry-session",
+    });
+
+    assert.equal(retry.status, "submitted");
+    assert.equal(retry.session.id, "retry-session");
+    assert.equal(retry.session.status, "submitted");
+  } finally {
+    await rm(project, { recursive: true, force: true });
+  }
+});
+
+test("CLI submit refuses env mock success without Computer Use evidence", async () => {
+  const project = await makeProject();
+  const root = join(project, ".ask-pro");
+
+  try {
+    const submit = await execResult(execFileAsync(process.execPath, [
       command,
       "submit",
       "--project",
@@ -188,31 +267,11 @@ test("CLI submit and check commands route the workflow with explicit mock ChatGP
         ...process.env,
         ASK_PRO_CHATGPT_SUBMIT_MOCK_RESULT: JSON.stringify({ ok: true, submitted_at: "2026-07-08T10:00:00.000Z" }),
       },
-    });
-    const submitOutput = JSON.parse(submit.stdout);
-    assert.equal(submitOutput.status, "submitted");
-    assert.equal(submitOutput.session_id, "cli-session");
+    }));
 
-    const check = await execFileAsync(process.execPath, [
-      command,
-      "check",
-      "cli-session",
-      "--root",
-      root,
-      "--now",
-      "2026-07-08T10:05:00.000Z",
-      "--automation",
-      "available",
-    ], {
-      env: {
-        ...process.env,
-        ASK_PRO_CHATGPT_COPY_MOCK_RESULT: JSON.stringify({ ok: true, text: "CLI advice only." }),
-      },
-    });
-    const checkOutput = JSON.parse(check.stdout);
-    assert.equal(checkOutput.status, "advice_summarized");
-    assert.equal(checkOutput.auto_apply, false);
-    assert.match(await readFile(checkOutput.session.transcript_path, "utf8"), /CLI advice only/);
+    assert.notEqual(submit.code, 0);
+    assert.match(submit.stderr, /Computer Use evidence/);
+    assert.equal(JSON.parse(await readFile(join(root, "sessions", "cli-session", "state.json"), "utf8")).status, "packaged");
   } finally {
     await rm(project, { recursive: true, force: true });
   }

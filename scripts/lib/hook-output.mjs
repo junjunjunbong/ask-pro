@@ -17,9 +17,18 @@ function xmlEscape(value) {
     .replaceAll("'", "&apos;");
 }
 
+function hasObviousNegation(prompt, triggerIndex) {
+  const prefix = prompt.slice(Math.max(0, triggerIndex - 40), triggerIndex).toLowerCase();
+  return /\b(?:do\s+not|don't|dont|never)\s+$/u.test(prefix);
+}
+
 function parsePromptCommand(prompt) {
-  const match = prompt.trim().match(/(?:^|\b)ask\s+pro(?:\s+(.*))?$/iu);
+  const trimmed = prompt.trim();
+  const match = trimmed.match(/(?:^|\b)ask\s+pro(?:\s+(.*))?$/iu);
   if (match === null) {
+    return null;
+  }
+  if (hasObviousNegation(trimmed, match.index ?? 0)) {
     return null;
   }
 
