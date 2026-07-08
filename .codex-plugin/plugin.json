@@ -1,0 +1,39 @@
+{
+  "name": "ask-pro",
+  "version": "0.1.0",
+  "description": "Codex plugin bundle for packaging ask-pro prompts and checking external advice sessions.",
+  "author": {
+    "name": "Junwon Seo"
+  },
+  "license": "MIT",
+  "keywords": [
+    "codex",
+    "codex-plugin",
+    "hooks",
+    "ask-pro"
+  ],
+  "skills": "./skills/",
+  "hooks": [
+    "./hooks/user-prompt-submit-ask-pro.json"
+  ],
+  "interface": {
+    "title": "Ask Pro",
+    "displayName": "Ask Pro",
+    "shortDescription": "Capture explicit ask-pro prompts for external advice workflows",
+    "description": "Adds a UserPromptSubmit hook that activates only on current ask pro commands and injects ask-pro mode context without running browser automation.",
+    "longDescription": "Ask Pro is a distributable Codex plugin bundle for explicit ask-pro CLI workflows. Its hook recognizes current prompt commands such as ask pro diagnose this or ask pro check <session-id>, then provides structured context for later skills and scripts.",
+    "developerName": "Junwon Seo",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Hooks",
+      "Context Injection",
+      "CLI"
+    ],
+    "defaultPrompt": [
+      "ask pro diagnose this",
+      "ask pro check <session-id>"
+    ],
+    "brandColor": "#2563EB",
+    "screenshots": []
+  }
+}
