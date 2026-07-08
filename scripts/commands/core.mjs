@@ -16,6 +16,27 @@ import {
 import { parseOptions, pathExists, readStdin, requireOption } from "../lib/cli-options.mjs";
 
 const REQUIRED_HOOK_COMMAND = 'node "${PLUGIN_ROOT}/scripts/ask-pro.mjs" hook user-prompt-submit';
+const REQUIRED_SKILL_GUARDRAILS = Object.freeze([
+  [
+    "explicit ask pro trigger wording",
+    (skill) => /explicitly\s+(?:says|invokes?|invoked)[\s\S]*ask pro/i.test(skill) && /ask pro\s+<request>/i.test(skill),
+  ],
+  ["explicit ask pro check <session-id> trigger wording", (skill) => /ask pro check\s+<session-id>/i.test(skill)],
+  ["session artifacts path", (skill) => /\.ask-pro\/sessions/i.test(skill)],
+  [
+    "ChatGPT macOS with Computer Use primary runtime operation",
+    (skill) => /ChatGPT macOS/i.test(skill) && /Computer Use/i.test(skill) && /primary/i.test(skill),
+  ],
+  [
+    "automation_update and fallback ask pro check wording",
+    (skill) => /automation_update/i.test(skill) && /fallback[\s\S]*ask pro check\s+<session-id>/i.test(skill),
+  ],
+  ["advisory-only and no auto-apply wording", (skill) => /advisory/i.test(skill) && /(?:no|never)\s+(?:automatic|auto-apply)/i.test(skill)],
+  [
+    "no Chrome/browser fallback wording",
+    (skill) => /Chrome/i.test(skill) && /browser/i.test(skill) && /(?:No|Do not use)[\s\S]*Chrome[\s\S]*browser[\s\S]*fallback/i.test(skill),
+  ],
+]);
 
 function normalizePluginPath(value) {
   return value.replace(/^\.\//u, "");
@@ -25,12 +46,39 @@ function findHookCommand(hookConfig) {
   return hookConfig?.hooks?.UserPromptSubmit?.[0]?.hooks?.[0]?.command;
 }
 
+async function validateSkillFile(skillPath) {
+  const errors = [];
+  let skill;
+  try {
+    skill = await readFile(skillPath, "utf8");
+  } catch (error) {
+    errors.push(`missing or unreadable skill path: ${skillPath}: ${error.message}`);
+    return errors;
+  }
+  for (const [name, accepts] of REQUIRED_SKILL_GUARDRAILS) {
+    if (!accepts(skill)) errors.push(`skill guardrail missing (${name})`);
+  }
+  return errors;
+}
+
+export async function validateSkill(args) {
+  const options = parseOptions(args);
+  const skillPath = resolve(requireOption(options, "path"));
+  const errors = await validateSkillFile(skillPath);
+  console.log(`ok: ${skillPath}`);
+  if (errors.length > 0) {
+    for (const error of errors) console.error(`error: ${error}`);
+    process.exitCode = 1;
+    return;
+  }
+  console.log("PASS validate-skill");
+}
+
 export async function validatePlugin(args) {
   const options = parseOptions(args);
   const root = resolve(typeof options.root === "string" ? options.root : ".");
   const manifestPath = process.env.ASK_PRO_PLUGIN_JSON ?? join(root, ".codex-plugin/plugin.json");
   const errors = [];
-  const warnings = [];
   const checked = [];
   let manifest;
 
@@ -56,9 +104,14 @@ export async function validatePlugin(args) {
     if (await pathExists(skillsPath)) checked.push("skills/");
     else errors.push(`missing skills path: ${normalizePluginPath(manifest.skills ?? "")}`);
 
-    const futureSkillPath = "skills/ask-pro/SKILL.md";
-    if (await pathExists(join(root, futureSkillPath))) checked.push(futureSkillPath);
-    else warnings.push(`missing-later: ${futureSkillPath}`);
+    const skillPath = "skills/ask-pro/SKILL.md";
+    const absoluteSkillPath = join(root, skillPath);
+    const skillErrors = await validateSkillFile(absoluteSkillPath);
+    if (skillErrors.length === 0) {
+      checked.push(`${skillPath} (skill guardrails)`);
+    } else {
+      errors.push(...skillErrors.map((error) => error.replace(absoluteSkillPath, skillPath)));
+    }
 
     for (const hookPath of manifest.hooks ?? []) {
       const normalizedHookPath = normalizePluginPath(hookPath);
@@ -76,7 +129,6 @@ export async function validatePlugin(args) {
   }
 
   for (const item of checked) console.log(`ok: ${item}`);
-  for (const warning of warnings) console.log(`warning: ${warning}`);
   if (errors.length > 0) {
     for (const error of errors) console.error(`error: ${error}`);
     process.exitCode = 1;

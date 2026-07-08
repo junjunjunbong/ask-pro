@@ -11,6 +11,7 @@ import {
   schedulerFixture,
   sessionFixture,
   sessionLockFixture,
+  validateSkill,
   validatePlugin,
 } from "./commands/core.mjs";
 import { checkCommand, submitCommand } from "./commands/workflow.mjs";
@@ -22,6 +23,9 @@ async function main() {
   switch (command) {
     case "validate-plugin":
       await validatePlugin(args);
+      break;
+    case "validate-skill":
+      await validateSkill(args);
       break;
     case "hook":
       await runHook(args);
