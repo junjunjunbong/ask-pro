@@ -17,8 +17,8 @@ ask-pro is a Codex plugin bundle for explicit GPT Pro consultation through ChatG
 ```sh
 node --test
 node scripts/ask-pro.mjs validate-plugin --root .
-node scripts/ask-pro.mjs pack-plugin --out .omo/evidence/package/ask-pro.zip
-unzip -l .omo/evidence/package/ask-pro.zip
+node scripts/ask-pro.mjs pack-plugin --out dist/ask-pro.zip
+unzip -l dist/ask-pro.zip
 ```
 
 ## Usage
@@ -46,4 +46,4 @@ In this environment, live ChatGPT.app automation is currently blocked by Compute
 
 ## Distribution
 
-`pack-plugin` creates a distributable zip from an allowlist of plugin files: manifest, hook JSON, skill file, scripts, tests, README, and package metadata. It excludes `.git/`, `.ask-pro/`, `.omo/evidence/`, raw GUI screenshots/evidence, `node_modules/`, hidden local state, and sensitive artifact paths.
+`pack-plugin` creates a distributable zip from an allowlist of plugin files: manifest, hook JSON, skill file, scripts, tests, README, and package metadata. It excludes `.git/`, `.ask-pro/`, raw GUI screenshots/evidence, `node_modules/`, hidden local state, and sensitive artifact paths.

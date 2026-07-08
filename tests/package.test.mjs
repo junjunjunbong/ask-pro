@@ -40,7 +40,6 @@ test("pack-plugin archives only distributable plugin files", async () => {
   assert.equal(entries.includes("package.json"), true);
   assert.equal(entries.some((entry) => entry.startsWith(".git/")), false);
   assert.equal(entries.some((entry) => entry.startsWith(".ask-pro/")), false);
-  assert.equal(entries.some((entry) => entry.startsWith(".omo/evidence/")), false);
   assert.equal(entries.some((entry) => entry.startsWith("node_modules/")), false);
   assert.deepEqual(entries, report.files);
 });
@@ -53,11 +52,9 @@ test("pack-plugin excludes sensitive local state from package input", async () =
   await cp(join(root, "README.md"), join(fixtureRoot, "README.md"));
   await cp(join(root, "package.json"), join(fixtureRoot, "package.json"));
   await mkdir(join(fixtureRoot, ".ask-pro/sessions"), { recursive: true });
-  await mkdir(join(fixtureRoot, ".omo/evidence"), { recursive: true });
   await mkdir(join(fixtureRoot, "node_modules/pkg"), { recursive: true });
   await mkdir(join(fixtureRoot, ".git"), { recursive: true });
   await writeFile(join(fixtureRoot, ".ask-pro/sessions/raw.md"), "raw transcript");
-  await writeFile(join(fixtureRoot, ".omo/evidence/gui.png"), "raw screenshot");
   await writeFile(join(fixtureRoot, "node_modules/pkg/index.js"), "module");
   await writeFile(join(fixtureRoot, ".git/config"), "local git state");
 
@@ -66,7 +63,6 @@ test("pack-plugin excludes sensitive local state from package input", async () =
   const entries = await unzipList(archive);
 
   assert.equal(entries.some((entry) => entry.includes(".ask-pro/")), false);
-  assert.equal(entries.some((entry) => entry.includes(".omo/evidence/")), false);
   assert.equal(entries.some((entry) => entry.includes("node_modules/")), false);
   assert.equal(entries.some((entry) => entry.includes(".git/")), false);
 });

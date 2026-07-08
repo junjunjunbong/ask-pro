@@ -21,7 +21,6 @@ const DISTRIBUTION_DIRS = Object.freeze([
 const SENSITIVE_PARTS = new Set([
   ".git",
   ".ask-pro",
-  ".omo",
   "node_modules",
   ".cache",
   ".DS_Store",
